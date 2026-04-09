@@ -1,0 +1,23 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Foundry",
+  "outputfilename": "foundry",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "wailsjsdir": "./frontend/src/lib",
+  "frontend:dev:serverUrl": "auto",
+  "build:dir": "build",
+  "nsisType": "single",
+  "info": {
+    "companyName": "Maximilian Oswald",
+    "productName": "Foundry",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026 Maximilian Oswald",
+    "comments": "Laravel project installer and feature manager"
+  },
+  "author": {
+    "name": "Maximilian Oswald",
+    "email": "maxi.osw@outlook.com"
+  }
+}

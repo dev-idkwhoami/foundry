@@ -1,0 +1,44 @@
+# Plan / internal docs
+.plan/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# Wails
+build/bin/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Test
+test/
