@@ -24,6 +24,7 @@ type Feature struct {
 type Patch struct {
 	File        string `yaml:"file" json:"file"`
 	Mode        string `yaml:"mode" json:"mode"`
+	Format      string `yaml:"format" json:"format"` // "cdiff" or empty for legacy git apply
 	Instruction string `yaml:"instruction" json:"instruction"`
 	Diff        string `yaml:"diff" json:"diff"`
 }

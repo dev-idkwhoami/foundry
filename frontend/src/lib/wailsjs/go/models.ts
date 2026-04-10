@@ -150,17 +150,19 @@ export namespace features {
 	export class Patch {
 	    file: string;
 	    mode: string;
+	    format: string;
 	    instruction: string;
 	    diff: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Patch(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.file = source["file"];
 	        this.mode = source["mode"];
+	        this.format = source["format"];
 	        this.instruction = source["instruction"];
 	        this.diff = source["diff"];
 	    }

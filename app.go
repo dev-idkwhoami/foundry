@@ -17,6 +17,7 @@ import (
 	"foundry/backend/herd"
 	"foundry/backend/installer"
 	foundrylog "foundry/backend/logger"
+	"foundry/backend/patcher"
 	"foundry/backend/transformer"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -298,9 +299,11 @@ func (a *App) GetPHPVersion() (string, error) {
 }
 
 // CheckPatchCompatibility checks whether a feature's auto patches can be
-// applied on top of the currently selected features. It applies selected
-// features' patches to the temp clone, runs git apply --check for the
-// candidate, then resets the clone.
+// applied on top of the currently selected features.
+//
+// For cdiff-format patches it uses the merge engine (no temp clone state
+// mutation). For legacy git patches it falls back to git apply --check
+// on the temp clone.
 func (a *App) CheckPatchCompatibility(featureID string, selectedIDs []string) CompatResult {
 	a.patchMu.Lock()
 	defer a.patchMu.Unlock()
@@ -309,48 +312,108 @@ func (a *App) CheckPatchCompatibility(featureID string, selectedIDs []string) Co
 		return CompatResult{false, "registry not ready"}
 	}
 
-	// Reset temp clone to clean state first.
-	resetCmd := exec.Command("git", "checkout", ".")
-	resetCmd.Dir = a.tempClonePath
-	_ = resetCmd.Run()
+	// Collect all cdiff patches from selected features + candidate.
+	allIDs := append(selectedIDs, featureID)
+	var diffs []patcher.Diff
+	hasCdiff := false
+	hasLegacy := false
 
-	// Apply all currently selected features' auto patches.
-	for _, sid := range selectedIDs {
-		f := a.registry.GetFeature(sid)
+	for _, fid := range allIDs {
+		f := a.registry.GetFeature(fid)
 		if f == nil {
 			continue
 		}
 		for _, p := range f.Patches {
-			patchPath := filepath.Join(a.tempClonePath, "features", sid, p.File)
-			cmd := exec.Command("git", "apply", patchPath)
+			if p.Mode == "manual" {
+				continue
+			}
+			if p.Format == "cdiff" {
+				hasCdiff = true
+				diffPath := filepath.Join(a.tempClonePath, "features", fid, p.File)
+				data, err := os.ReadFile(diffPath)
+				if err != nil {
+					return CompatResult{false, fmt.Sprintf("reading %s/%s: %v", fid, p.File, err)}
+				}
+				diff, err := patcher.Parse(string(data))
+				if err != nil {
+					return CompatResult{false, fmt.Sprintf("parsing %s/%s: %v", fid, p.File, err)}
+				}
+				for i := range diff.Files {
+					for j := range diff.Files[i].Hunks {
+						diff.Files[i].Hunks[j].FeatureID = fid
+					}
+				}
+				diffs = append(diffs, *diff)
+			} else {
+				hasLegacy = true
+			}
+		}
+	}
+
+	// Check cdiff patches via merge engine.
+	if hasCdiff {
+		conflicts, err := patcher.Check(patcher.ApplyRequest{
+			ProjectDir: a.tempClonePath,
+			Diffs:      diffs,
+		})
+		if err != nil {
+			return CompatResult{false, err.Error()}
+		}
+		if len(conflicts) > 0 {
+			var reasons []string
+			for _, c := range conflicts {
+				reasons = append(reasons, fmt.Sprintf("%s: %s vs %s", c.File, c.FeatureA, c.FeatureB))
+			}
+			return CompatResult{false, strings.Join(reasons, "; ")}
+		}
+	}
+
+	// Fall back to git apply --check for legacy patches.
+	if hasLegacy {
+		resetCmd := exec.Command("git", "checkout", ".")
+		resetCmd.Dir = a.tempClonePath
+		_ = resetCmd.Run()
+
+		for _, sid := range selectedIDs {
+			f := a.registry.GetFeature(sid)
+			if f == nil {
+				continue
+			}
+			for _, p := range f.Patches {
+				if p.Format == "cdiff" || p.Mode == "manual" {
+					continue
+				}
+				patchPath := filepath.Join(a.tempClonePath, "features", sid, p.File)
+				cmd := exec.Command("git", "apply", patchPath)
+				cmd.Dir = a.tempClonePath
+				_ = cmd.Run()
+			}
+		}
+
+		candidate := a.registry.GetFeature(featureID)
+		if candidate == nil {
+			return CompatResult{false, fmt.Sprintf("feature %q not found", featureID)}
+		}
+
+		for _, p := range candidate.Patches {
+			if p.Format == "cdiff" || p.Mode == "manual" {
+				continue
+			}
+			patchPath := filepath.Join(a.tempClonePath, "features", featureID, p.File)
+			cmd := exec.Command("git", "apply", "--check", patchPath)
 			cmd.Dir = a.tempClonePath
-			_ = cmd.Run() // best-effort; these should succeed
+			if out, err := cmd.CombinedOutput(); err != nil {
+				r := exec.Command("git", "checkout", ".")
+				r.Dir = a.tempClonePath
+				_ = r.Run()
+				return CompatResult{false, strings.TrimSpace(string(out))}
+			}
 		}
-	}
 
-	// Now check if the candidate feature's patches apply cleanly.
-	candidate := a.registry.GetFeature(featureID)
-	if candidate == nil {
-		return CompatResult{false, fmt.Sprintf("feature %q not found", featureID)}
+		resetCmd2 := exec.Command("git", "checkout", ".")
+		resetCmd2.Dir = a.tempClonePath
+		_ = resetCmd2.Run()
 	}
-
-	for _, p := range candidate.Patches {
-		patchPath := filepath.Join(a.tempClonePath, "features", featureID, p.File)
-		cmd := exec.Command("git", "apply", "--check", patchPath)
-		cmd.Dir = a.tempClonePath
-		if out, err := cmd.CombinedOutput(); err != nil {
-			// Reset before returning.
-			r := exec.Command("git", "checkout", ".")
-			r.Dir = a.tempClonePath
-			_ = r.Run()
-			return CompatResult{false, strings.TrimSpace(string(out))}
-		}
-	}
-
-	// Reset the temp clone back to clean state.
-	resetCmd2 := exec.Command("git", "checkout", ".")
-	resetCmd2.Dir = a.tempClonePath
-	_ = resetCmd2.Run()
 
 	return CompatResult{true, ""}
 }

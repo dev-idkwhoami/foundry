@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"foundry/backend/appdata"
+	"foundry/backend/cli"
 	"foundry/backend/config"
 	"foundry/backend/db"
 	foundrylog "foundry/backend/logger"
@@ -22,6 +23,11 @@ import (
 var assets embed.FS
 
 func main() {
+	// CLI subcommands bypass the GUI entirely.
+	if cli.HandleSubcommand(os.Args) {
+		return
+	}
+
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	debug := flag.Bool("debug", false, "Enable debug mode (shows developer tools in UI)")
 	flag.Parse()

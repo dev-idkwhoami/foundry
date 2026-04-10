@@ -54,6 +54,18 @@ foundry my-app
 
 When launched from a directory, Foundry uses the current directory as the working directory and the argument as the project name.
 
+### CLI subcommands (feature development)
+
+Run from within the starter repository. These bypass the GUI entirely.
+
+| Command | Description |
+|---|---|
+| `foundry create [<name>]` | Scaffold a new feature (branch + directory + manifest + mappings) |
+| `foundry diff --feature <id>` | Generate a `.cdiff` from current branch changes |
+| `foundry publish --feature <id>` | Publish feature to its branch |
+| `foundry validate` | Check all features for patch conflicts |
+| `foundry check <id> --with f1,f2` | Check one feature against a set |
+
 ## Configuration
 
 App config lives at `%APPDATA%\Foundry\config.yml`:
@@ -70,7 +82,6 @@ setup:
 
 cleanup:
   - features
-  - app/Console/Commands/Foundry
 ```
 
 Flux UI Pro credentials and other settings can be configured in the Settings panel (gear icon).

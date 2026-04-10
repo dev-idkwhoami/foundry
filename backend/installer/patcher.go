@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"foundry/backend/features"
+	"foundry/backend/patcher"
 	"foundry/backend/transformer"
 )
 
@@ -42,7 +43,9 @@ func applyPatches(projectDir string, registry *features.Registry, selectedIDs []
 	}
 
 	var manualPatches []ManualPatch
+	var cdiffDiffs []patcher.Diff
 
+	// First pass: collect all patches, run pre-patch hooks, gather cdiffs.
 	for _, featureID := range ordered {
 		feature := registry.GetFeature(featureID)
 		if feature == nil {
@@ -94,7 +97,7 @@ func applyPatches(projectDir string, registry *features.Registry, selectedIDs []
 				continue
 			}
 
-			// Auto patch: read diff, apply mappings, git apply.
+			// Auto patch: read diff, apply mappings.
 			diffPath := filepath.Join(featureDir, patch.File)
 			diffContent, err := os.ReadFile(diffPath)
 			if err != nil {
@@ -109,10 +112,25 @@ func applyPatches(projectDir string, registry *features.Registry, selectedIDs []
 				}
 			}
 
-			emit(fmt.Sprintf("Applying patch: %s/%s", featureID, patch.File))
-
-			if err := gitApply(projectDir, resolved); err != nil {
-				return nil, fmt.Errorf("git apply %s/%s: %w", featureID, patch.File, err)
+			if patch.Format == "cdiff" {
+				// Parse and collect for batch apply.
+				diff, err := patcher.Parse(resolved)
+				if err != nil {
+					return nil, fmt.Errorf("parsing cdiff %s/%s: %w", featureID, patch.File, err)
+				}
+				// Tag all hunks with the feature ID.
+				for i := range diff.Files {
+					for j := range diff.Files[i].Hunks {
+						diff.Files[i].Hunks[j].FeatureID = featureID
+					}
+				}
+				cdiffDiffs = append(cdiffDiffs, *diff)
+			} else {
+				// Legacy git apply.
+				emit(fmt.Sprintf("Applying patch: %s/%s", featureID, patch.File))
+				if err := gitApply(projectDir, resolved); err != nil {
+					return nil, fmt.Errorf("git apply %s/%s: %w", featureID, patch.File, err)
+				}
 			}
 		}
 
@@ -137,8 +155,36 @@ func applyPatches(projectDir string, registry *features.Registry, selectedIDs []
 				Copy:        copyText,
 			})
 		}
+	}
 
-		// Post-patch hooks for this feature.
+	// Apply all cdiff patches in one merged pass.
+	if len(cdiffDiffs) > 0 {
+		emit("Applying contextual diffs...")
+		result, err := patcher.Apply(patcher.ApplyRequest{
+			ProjectDir: projectDir,
+			Diffs:      cdiffDiffs,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("applying cdiffs: %w", err)
+		}
+		if len(result.Conflicts) > 0 {
+			var msgs []string
+			for _, c := range result.Conflicts {
+				msgs = append(msgs, fmt.Sprintf("%s: %s vs %s — %s", c.File, c.FeatureA, c.FeatureB, c.Reason))
+			}
+			return nil, fmt.Errorf("patch conflicts:\n%s", strings.Join(msgs, "\n"))
+		}
+		for _, f := range result.Modified {
+			emit(fmt.Sprintf("Modified: %s", f))
+		}
+	}
+
+	// Run post-patch hooks after all patches are applied.
+	for _, featureID := range ordered {
+		feature := registry.GetFeature(featureID)
+		if feature == nil {
+			continue
+		}
 		if len(feature.Hooks.PostPatch) > 0 {
 			resolved := resolveCommands(featureID, feature.Hooks.PostPatch, configValues)
 			if err := runCommands(projectDir, resolved, emit); err != nil {

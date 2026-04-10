@@ -62,8 +62,32 @@ A custom Laravel repository that is always cloned as the base. It contains:
 ### Features
 Self-contained units of functionality defined by a manifest, a set of patches, and a mappings file. Features are applied on top of the styled starter after cloning.
 
-### Git Patches
-Each feature ships one or more `.diff` files generated via `git diff main -- . ':(exclude)features/'`. Patches always apply against the repository's `main` branch. The `:(exclude)features/` pathspec ensures patches never include the features directory itself, keeping them clean regardless of which features have been merged to `main`.
+### Patches
+Each feature ships one or more patch files. Two formats are supported:
+
+- **`.cdiff` (contextual diff)** — the preferred format. Uses context-matching instead of line numbers, allowing multiple features to contribute to the same file region without conflicts. Generated via `foundry diff`.
+- **`.diff` (legacy git diff)** — applied via `git apply`. Generated via `git diff main -- . ':(exclude)features/'`.
+
+Patches always apply against the repository's `main` branch. The `:(exclude)features/` pathspec ensures patches never include the features directory itself.
+
+#### Contextual Diff Format (`.cdiff`)
+
+Like unified diff but without line numbers in `@@` headers:
+
+```
+--- a/resources/views/layouts/app.blade.php
++++ b/resources/views/layouts/app.blade.php
+@@
+ <nav class="main-nav">
++    <a href="/teams">Teams</a>
+ </nav>
+```
+
+Line prefixes: ` ` = context, `+` = addition, `-` = deletion. `---`/`+++` = file header. `@@` = hunk separator.
+
+Context lines anchor the hunk by matching against the actual file content (sliding window search). This means hunks survive line number shifts caused by other features' patches.
+
+**Merge engine:** When multiple features target the same file, all hunks are matched, merged, and conflict-checked before any file is written. Pure additions at the same anchor point stack in topological (dependency) order. Overlapping hunks that modify the same lines are flagged as conflicts.
 
 ---
 
@@ -77,16 +101,16 @@ your/styled-starter (GitHub, default branch: main)
 └── features/
     ├── teams/
     │   ├── manifest.yaml
-    │   ├── patch.diff
+    │   ├── changes.cdiff
     │   └── mappings.yaml
     ├── magic-link/
     │   ├── manifest.yaml
-    │   ├── patch.diff
+    │   ├── changes.cdiff
     │   └── mappings.yaml
     └── tenancy/
         ├── manifest.yaml
-        ├── patch.diff
-        ├── middleware.diff
+        ├── changes.cdiff
+        ├── middleware.cdiff
         └── mappings.yaml
 ```
 
@@ -182,8 +206,9 @@ hooks:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `file` | string | yes | Path to the `.diff` file relative to the feature directory |
+| `file` | string | yes | Path to the patch file relative to the feature directory |
 | `mode` | string | no | `auto` (default) or `manual` |
+| `format` | string | no | `cdiff` for contextual diffs, empty for legacy `git apply` |
 | `instruction` | string | no | Plain-language instruction shown to the user for `manual` patches |
 
 #### `instructions[]`
@@ -352,11 +377,14 @@ Substitution resolves the config value through the transformer chain (left to ri
 When a feature is selected, any feature listed in its `incompatible` array is immediately disabled in the UI. This is static and requires no computation.
 
 ### Dynamic (patch-based)
-Patch compatibility is validated **at feature selection time** using `git apply --check` (dry-run) against a **cached clone** of the repository in `%APPDATA%/Foundry/tmp/<sha1(repoURL)>/`.
+Patch compatibility is validated **at feature selection time** against a **cached clone** of the repository in `%APPDATA%/Foundry/tmp/<sha1(repoURL)>/`.
+
+- **cdiff patches:** The merge engine parses all selected features' hunks, matches them against the target files, and runs conflict detection. Pure additions at the same anchor are allowed (they stack); overlapping modifications are flagged as conflicts.
+- **Legacy patches:** Falls back to `git apply --check` (dry-run) against the temp clone.
 
 When a user toggles a feature on:
-1. The installer runs `git apply --check` for the new feature's auto patches against the current selection state in the temp clone
-2. If the check fails, the feature is **deselected and disabled** in the UI
+1. The check runs for the new feature's patches against the current selection
+2. If conflicts are found, the feature is **deselected and disabled** in the UI
 3. The reason is logged (visible in `--verbose` mode)
 
 This prevents the user from ever reaching the install step with an incompatible feature set.
@@ -508,47 +536,39 @@ The `--debug` CLI flag enables developer-facing UI features:
 The `main` branch is the **clean base** — it only contains:
 - The base Laravel application
 - The `features/` directory (manifests, patches, mappings)
-- The `app/Console/Commands/Foundry/` DX artisan commands
 
 **Feature code never lands on `main`.** Each feature lives on its own branch. Only the `features/<id>/` directory is published back to `main`.
 
 ### Development Flow
 
-1. Create a feature branch: `git checkout -b features/magic-link`
+1. Scaffold the feature: `foundry create Magic Link` (creates branch, directory, manifest, mappings)
 2. Write code as normal against the starter
-3. Generate patch: `git diff main -- . ':(exclude)features/' > features/magic-link/patch.diff`
-4. Write `manifest.yaml` (and `mappings.yaml` if needed) in `features/magic-link/`
+3. Generate patch: `foundry diff --feature magic-link`
+4. Edit `manifest.yaml` and `mappings.yaml` as needed
 5. Commit everything on the feature branch (code + `features/` folder)
-6. Publish only the `features/<id>/` directory to `main`:
+6. Publish to `main`: `foundry publish --feature magic-link`
 
-```bash
-# From the feature branch, after committing:
-git stash
-git checkout main
-git checkout features/magic-link -- features/magic-link/
-git add features/magic-link/
-git commit -m "Publish magic-link feature"
-git checkout features/magic-link
-git stash pop
-```
-
-The feature branch stays around as the source of truth for the code. The patch file in `features/` is the portable artifact that Foundry applies at install time.
+The feature branch stays around as the source of truth for the code. The `.cdiff` file in `features/` is the portable artifact that Foundry applies at install time.
 
 ### Updating a Feature
 
 When you change feature code:
 1. Make changes on the feature branch
-2. Re-generate the patch: `git diff main -- . ':(exclude)features/' > features/magic-link/patch.diff`
+2. Re-generate the patch: `foundry diff --feature magic-link`
 3. Commit on the feature branch
-4. Re-publish `features/magic-link/` to `main` (same checkout flow as above)
+4. Re-publish: `foundry publish --feature magic-link`
 
-### DX Artisan Commands
+### CLI Subcommands
 
-The starter repo includes artisan commands in `app/Console/Commands/Foundry/` that automate this workflow:
-- **`foundry:diff`** — generates the patch diff for the current feature branch
-- **`foundry:publish`** — commits current changes, publishes `features/<id>/` to `main`, and switches back
+The `foundry` binary includes subcommands for feature development. These run without the GUI, Wails, or database — only filesystem access is needed.
 
-These commands are deleted from the project during cleanup (configured in `config.yml` → `cleanup`).
+| Command | Description |
+|---|---|
+| `foundry create [<name>]` | Scaffold a new feature: creates `feature/<id>` branch, `features/<id>/` directory with minimal `manifest.yaml` and `mappings.yaml`. ID is derived from name via snake_case + lowercase. Prompts for name if omitted |
+| `foundry diff [--feature <id>] [--out <path>] [--base <branch>]` | Generate a `.cdiff` from `git diff`, stripping line numbers. `--feature` auto-places output in `features/<id>/changes.cdiff` |
+| `foundry publish --feature <id> [--message <msg>]` | Stash → checkout/create `feature/<id>` branch → pop → stage → commit |
+| `foundry validate [--verbose]` | Build registry, check all features' cdiff patches for conflicts using the merge engine |
+| `foundry check <id> --with feat1,feat2` | Check one feature's compatibility against a specific set of features |
 
 ### Manual Steps
 
@@ -575,6 +595,8 @@ Legacy `mode: manual` patches with a separate diff file are still supported but 
 | `backend/logger` | Structured logging (default/verbose), per-day log files (append mode), auto-pruning at 16 files, file + Wails event emission |
 | `backend/git` | Cached clone-or-pull to `%APPDATA%/Foundry/tmp/<sha1>/`, clone to target directory |
 | `backend/features` | Feature manifest/mappings parsing, registry with dependency/incompatibility graphs, topological sort, mapping resolver |
+| `backend/patcher` | Contextual diff engine: parser, context matcher, hunk merger with conflict detection, file writer. Supports `.cdiff` format |
+| `backend/cli` | CLI subcommand dispatcher and commands: `diff`, `publish`, `validate`, `check` |
 | `backend/transformer` | Token transformers: lower, title, plural, snake, camel, dot (chainable) |
 | `backend/herd` | Herd site linking, `.env.example` → `.env` copy, PostgreSQL database creation (connects via `postgres` db), `.env` configuration |
 | `backend/installer` | Installation orchestrator, patch applier, post-install command runner, cleanup |
@@ -585,7 +607,7 @@ Legacy `mode: manual` patches with a separate diff file are still supported but 
 - `GetGitVersion`, `GetHerdVersion`, `GetPHPVersion`, `GetComposerVersion`
 - `GetFluxLicenseKey`, `SetFluxLicenseKey`, `GetFluxUsername`, `SetFluxUsername`, `WriteAuthJSON`
 - `SetRepository`, `SelectDirectory`, `AddRecentDirectory`, `GetRecentDirectories`
-- `CheckPatchCompatibility` — `git apply --check` dry-run against cached clone
+- `CheckPatchCompatibility` — merge engine check for cdiff patches, `git apply --check` fallback for legacy
 - `CheckTargetDirectory` — returns `"empty"` or `"not-empty"` for target path validation
 - `ResolveToken` — apply transformer chain (used for live preview in `--debug` mode)
 - `IsDebug` — returns whether `--debug` flag is set

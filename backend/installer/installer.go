@@ -72,7 +72,7 @@ func Run(ctx context.Context, req InstallRequest, cfg *config.AppConfig, registr
 	projectDir := fmt.Sprintf("%s\\%s", req.WorkingDir, req.ProjectName)
 
 	emitLog := func(msg string) {
-		logger.Info(msg)
+		logger.Info("%s", msg)
 		runtime.EventsEmit(ctx, "install:log", map[string]string{
 			"message": msg,
 			"level":   "info",
