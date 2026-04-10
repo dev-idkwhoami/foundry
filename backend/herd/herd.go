@@ -37,6 +37,17 @@ func Setup(projectDir, projectName string) error {
 	return nil
 }
 
+// Unlink runs `herd unlink` from the given project directory to remove the
+// Herd site link.
+func Unlink(projectDir string) error {
+	cmd := exec.Command("herd", "unlink")
+	cmd.Dir = projectDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w\n%s", err, out)
+	}
+	return nil
+}
+
 // linkSite runs `herd link --secure <siteName>` from the project directory.
 func linkSite(projectDir, siteName string) error {
 	cmd := exec.Command("herd", "link", "--secure", siteName)

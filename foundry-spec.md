@@ -110,9 +110,12 @@ incompatible:
 patches:
   - file: patch.diff
     mode: auto
-  - file: middleware.diff
-    mode: manual
-    instruction: Add to the web middleware group in bootstrap/app.php
+
+instructions:
+  - text: "Add to the web middleware group in bootstrap/app.php"
+    copy: "\\App\\Http\\Middleware\\EnsureTenant::class,"
+  - text: "Add the BelongsTo{{tenant_noun:title}} trait to any model that should be scoped to the current tenant."
+    copy: "use BelongsTo{{tenant_noun:title}};"
 
 config:
   - key: tenant_noun
@@ -171,6 +174,7 @@ hooks:
 | `requires` | string[] | no | IDs of features this feature depends on |
 | `incompatible` | string[] | no | IDs of features that cannot coexist with this one |
 | `patches` | Patch[] | no | List of diff files to apply |
+| `instructions` | Instruction[] | no | Manual steps shown to the user after installation (Step 6) |
 | `config` | ConfigField[] | no | User-configurable options (rendered as form fields in Step 3) |
 | `hooks` | Hooks | no | Commands to run at specific points in the installation pipeline |
 
@@ -181,6 +185,15 @@ hooks:
 | `file` | string | yes | Path to the `.diff` file relative to the feature directory |
 | `mode` | string | no | `auto` (default) or `manual` |
 | `instruction` | string | no | Plain-language instruction shown to the user for `manual` patches |
+
+#### `instructions[]`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `text` | string | yes | Plain-language instruction shown to the user in the manual steps checklist |
+| `copy` | string | no | Copyable code snippet displayed below the instruction. Clicking copies to clipboard |
+
+Both `text` and `copy` support `{{key:transformer}}` token syntax, resolved against the feature's config values.
 
 #### `config[]`
 
@@ -235,6 +248,12 @@ With `tenant_noun` set to `Organization`, these resolve to:
 ### Patch Modes
 - **`auto`** (default) — applied via `git apply` without user interaction
 - **`manual`** — skipped during auto-apply; surfaced to the user in Step 6 as a checklist with the `instruction` text and the raw diff
+
+### Instructions vs Manual Patches
+
+The `instructions` field is the preferred way to define manual steps. Use it for actions the user must perform that don't have an associated diff file (e.g., adding a trait to models, registering middleware).
+
+Legacy `mode: manual` patches still work and appear in the same checklist, but new features should use `instructions` instead — no empty placeholder diff files needed.
 
 ### `requires`
 Declares that this feature depends on another feature. Used to:
@@ -344,6 +363,8 @@ This prevents the user from ever reaching the install step with an incompatible 
 
 ### Step 2: Feature Selection
 - List of available features read from the temp clone's `features/` directory
+- Search input to filter features by name or description
+- Scrollable card grid with custom scrollbar when features overflow the viewport
 - Checkboxes with name, description
 - Selecting a feature **auto-selects** its `requires` dependencies
 - A required feature **cannot be deselected** while a dependent feature is still selected
@@ -393,7 +414,8 @@ Triggered on mount of the InstallProgress component. The backend runs the pipeli
  │  │  hooks.pre-patch       (this feature)         │      │
  │  │  Apply auto patches    (resolve mappings      │      │
  │  │                         → git apply via stdin) │      │
- │  │  Collect manual patches (for Step 6)          │      │
+ │  │  Collect manual patches + instructions          │      │
+ │  │  (for Step 6, resolve tokens in both)          │      │
  │  │  hooks.post-patch      (this feature)         │      │
  │  └───────────────────────────────────────────────┘      │
  │  ... repeat for each selected feature ...               │
@@ -430,7 +452,8 @@ Each stage emits an ASCII banner line to the log panel (e.g. `── Clone ─�
 **UI:** Two-column layout with a stage sidebar (status icons per stage) and a terminal-style log panel with auto-scroll and custom scrollbars (both axes). The log panel stretches to fill available window height. On success: "Open in Explorer" button (opens target dir + quits) and "Close" button (quits). On error: error card with stage name and message.
 
 ### Step 6: Manual Steps Checklist
-- One card per manual patch with feature badge, instruction text, and checkbox
+- One card per manual step (from `instructions` and legacy `mode: manual` patches) with feature badge, instruction text, and checkbox
+- Instructions with a `copy` field show a monospace code block with a click-to-copy button
 - Checked items show strikethrough and reduced opacity
 - Progress counter ("X of Y steps completed")
 - "Open Project in Explorer" button at top
@@ -508,9 +531,17 @@ The starter repo includes artisan commands in `app/Console/Commands/Foundry/` th
 
 These commands are deleted from the project during cleanup (configured in `config.yml` → `cleanup`).
 
-### Manual Patches
+### Manual Steps
 
-For code that can't be auto-applied (e.g. middleware registration in `bootstrap/app.php`), generate a separate diff for just that file and set `mode: manual` in the manifest. The user will see the instruction and diff in Step 6.
+For steps the user must perform manually after installation (e.g. adding a trait to models, registering middleware), use the `instructions` field:
+
+```yaml
+instructions:
+  - text: "Add to the web middleware group in bootstrap/app.php"
+    copy: "\\App\\Http\\Middleware\\EnsureTenant::class,"
+```
+
+Legacy `mode: manual` patches with a separate diff file are still supported but `instructions` is preferred for new features.
 
 ---
 
@@ -542,6 +573,9 @@ For code that can't be auto-applied (e.g. middleware registration in `bootstrap/
 - `OpenInExplorer` — opens a directory in Windows Explorer
 - `OpenFileInEditor` — opens a file in the system default editor (`cmd /c start`)
 - `Install` — triggers the full async installation pipeline
+- `ListProjects` — returns all tracked installations from SQLite
+- `HerdUnlink` — runs `herd unlink` in a project directory
+- `ForgetProject` — unlinks from Herd (best-effort) and deletes the installation record
 - `Quit` — closes the application
 
 ### Svelte Frontend
@@ -550,12 +584,13 @@ For code that can't be auto-applied (e.g. middleware registration in `bootstrap/
 - **Stores:** `project.ts` (name, dir, target path), `features.ts` (registry, selection, config values, compat state), `wizard.ts` (step navigation, validation gates), `install.ts` (manual steps data, prerequisitesMet gate)
 - **Step 0 (Startup):** Loading spinner while clone/pull + registry build completes. Listens for `ready` event with `GetStartupResult()` fallback for race condition
 - **Step 1 (Project Setup):** Project name, directory display, target path warning, environment cards (Git, Herd, Flux Pro status). Blocks advancement if Git or Herd missing
-- **Step 2 (Feature Selection):** Checkbox grid with auto-select dependencies, locked deps, static + dynamic disable, patch compat checking
+- **Step 2 (Feature Selection):** Search input with filter, scrollable checkbox grid with custom scrollbar, auto-select dependencies, locked deps, static + dynamic disable, patch compat checking
 - **Step 3 (Feature Config):** Accordion per feature, text/select inputs. Transformer preview only in `--debug` mode
 - **Step 4 (Review):** Summary cards for project info, selected features, patches, config values, manual step count, Install CTA
 - **Step 5 (Install Progress):** Stage sidebar with status icons, terminal-style log panel with auto-scroll and custom scrollbars, full-width responsive layout. ASCII stage banners in log. Success: "Open in Explorer" + "Close" (both quit app). Error: prominent error card with stage-specific guidance (patching, clone, herd), scrollable error detail
-- **Step 6 (Manual Checklist):** Cards per manual patch with checkbox, feature badge, instruction text. Progress tracking, completion gating, "Open Project in Explorer" button. Empty state auto-enables close
+- **Step 6 (Manual Checklist):** Cards per manual step (instructions + legacy manual patches) with checkbox, feature badge, instruction text, optional copyable code snippet. Progress tracking, completion gating, "Open Project in Explorer" button. Empty state auto-enables close
 - **Settings page:** Modal overlay for repository URL, Flux username + license key. Closing refreshes env cards
+- **Project manager:** Modal overlay (header icon) listing tracked installations with Unlink Herd and Forget Project actions
 - **UX:** Frameless window with custom title bar, text selection disabled outside inputs, no nav/footer on install/manual steps
 
 ### Network calls

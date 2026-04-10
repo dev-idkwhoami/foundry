@@ -123,6 +123,22 @@ func RecordFeatures(installationID int64, features []InstalledFeature) error {
 	return nil
 }
 
+// GetInstallationByID returns the installation with the given ID.
+func GetInstallationByID(id int64) (*Installation, error) {
+	var inst Installation
+	err := instance.QueryRow(`
+		SELECT id, path_hash, project_path, project_name, repository, site_name, db_name, installed_at, updated_at
+		FROM installations WHERE id = ?
+	`, id).Scan(
+		&inst.ID, &inst.PathHash, &inst.ProjectPath, &inst.ProjectName, &inst.Repository,
+		&inst.SiteName, &inst.DbName, &inst.InstalledAt, &inst.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("db: get installation by id: %w", err)
+	}
+	return &inst, nil
+}
+
 // GetInstallationByPath returns the installation for the given project path,
 // or nil if none exists.
 func GetInstallationByPath(projectPath string) (*Installation, error) {

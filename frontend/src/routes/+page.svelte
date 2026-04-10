@@ -10,12 +10,14 @@
 	import InstallProgress from "$lib/components/steps/InstallProgress.svelte";
 	import ManualChecklist from "$lib/components/steps/ManualChecklist.svelte";
 	import SettingsPage from "$lib/components/SettingsPage.svelte";
+	import ProjectManager from "$lib/components/ProjectManager.svelte";
 	import { currentStepId, goToStep, resolveFirstStep } from "$lib/stores/wizard";
 	import { projectName, workingDir, hasContext } from "$lib/stores/project";
-	import { FolderTree, Settings, X } from "lucide-svelte";
+	import { FolderTree, Settings, Archive, X } from "lucide-svelte";
 	import { onMount } from "svelte";
 
 	let showSettings = $state(false);
+	let showProjects = $state(false);
 	let projectSetupRef: ReturnType<typeof ProjectSetup> | undefined = $state(undefined);
 
 	function quit() {
@@ -56,6 +58,13 @@
 		<FolderTree color="#00e6d6" class="h-6 w-6" />
 		<h1 class="text-lg font-bold tracking-tight">Foundry</h1>
 		<div class="ml-auto flex items-center gap-1.5" style="--wails-draggable: no-drag">
+			<button
+				onclick={() => (showProjects = true)}
+				class="flex h-7 w-7 items-center justify-center border-2 border-border bg-background text-foreground transition-colors hover:bg-muted"
+				title="Manage Projects"
+			>
+				<Archive class="h-4 w-4" />
+			</button>
 			<button
 				onclick={() => (showSettings = true)}
 				class="flex h-7 w-7 items-center justify-center border-2 border-border bg-background text-foreground transition-colors hover:bg-muted"
@@ -105,4 +114,8 @@
 
 {#if showSettings}
 	<SettingsPage onclose={() => { showSettings = false; projectSetupRef?.refreshEnv(); }} />
+{/if}
+
+{#if showProjects}
+	<ProjectManager onclose={() => { showProjects = false; }} />
 {/if}

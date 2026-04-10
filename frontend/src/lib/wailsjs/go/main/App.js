@@ -14,6 +14,10 @@ export function CheckTargetDirectory(arg1) {
   return window['go']['main']['App']['CheckTargetDirectory'](arg1);
 }
 
+export function ForgetProject(arg1) {
+  return window['go']['main']['App']['ForgetProject'](arg1);
+}
+
 export function GetComposerVersion() {
   return window['go']['main']['App']['GetComposerVersion']();
 }
@@ -62,12 +66,20 @@ export function GetStartupResult() {
   return window['go']['main']['App']['GetStartupResult']();
 }
 
+export function HerdUnlink(arg1) {
+  return window['go']['main']['App']['HerdUnlink'](arg1);
+}
+
 export function Install(arg1) {
   return window['go']['main']['App']['Install'](arg1);
 }
 
 export function IsDebug() {
   return window['go']['main']['App']['IsDebug']();
+}
+
+export function ListProjects() {
+  return window['go']['main']['App']['ListProjects']();
 }
 
 export function OpenFileInEditor(arg1) {

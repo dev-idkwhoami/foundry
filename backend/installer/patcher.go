@@ -8,14 +8,16 @@ import (
 	"strings"
 
 	"foundry/backend/features"
+	"foundry/backend/transformer"
 )
 
-// ManualPatch holds info about a patch the user needs to apply manually.
+// ManualPatch holds info about a step the user needs to perform manually.
 type ManualPatch struct {
 	FeatureName string `json:"featureName"`
 	FeatureID   string `json:"featureId"`
 	File        string `json:"file"`
 	Instruction string `json:"instruction"`
+	Copy        string `json:"copy"`
 }
 
 // applyPatches applies auto patches in dependency order and returns manual patches.
@@ -112,6 +114,28 @@ func applyPatches(projectDir string, registry *features.Registry, selectedIDs []
 			if err := gitApply(projectDir, resolved); err != nil {
 				return nil, fmt.Errorf("git apply %s/%s: %w", featureID, patch.File, err)
 			}
+		}
+
+		// Collect instructions for this feature, resolving tokens in both fields.
+		for _, inst := range feature.Instructions {
+			text := inst.Text
+			copyText := inst.Copy
+			if len(featureConfig) > 0 {
+				if resolved, err := transformer.ResolveAll(text, featureConfig); err == nil {
+					text = resolved
+				}
+				if copyText != "" {
+					if resolved, err := transformer.ResolveAll(copyText, featureConfig); err == nil {
+						copyText = resolved
+					}
+				}
+			}
+			manualPatches = append(manualPatches, ManualPatch{
+				FeatureName: feature.Name,
+				FeatureID:   featureID,
+				Instruction: text,
+				Copy:        copyText,
+			})
 		}
 
 		// Post-patch hooks for this feature.

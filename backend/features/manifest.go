@@ -15,6 +15,7 @@ type Feature struct {
 	Requires     []string      `yaml:"requires" json:"requires"`
 	Incompatible []string      `yaml:"incompatible" json:"incompatible"`
 	Patches      []Patch       `yaml:"patches" json:"patches"`
+	Instructions []Instruction `yaml:"instructions" json:"instructions"`
 	Config       []ConfigField `yaml:"config" json:"config"`
 	Hooks        Hooks         `yaml:"hooks" json:"hooks"`
 }
@@ -25,6 +26,12 @@ type Patch struct {
 	Mode        string `yaml:"mode" json:"mode"`
 	Instruction string `yaml:"instruction" json:"instruction"`
 	Diff        string `yaml:"diff" json:"diff"`
+}
+
+// Instruction describes a manual step the user must perform after installation.
+type Instruction struct {
+	Text string `yaml:"text" json:"text"`
+	Copy string `yaml:"copy" json:"copy"`
 }
 
 // ConfigField represents a user-configurable option exposed by a feature.

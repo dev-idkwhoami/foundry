@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" width="128" alt="Foundry" />
+  <img src=".github/assets/logo.svg" width="128" alt="Foundry" />
 </p>
 
 <h1 align="center">Foundry</h1>
@@ -105,8 +105,6 @@ See [spec.md](foundry-spec.md) for the full technical specification.
 
 ## Roadmap
 
-- [ ] **Project management mode** — detect existing installations and switch to a management UI
-- [ ] **Uninstall actions** — unlink Herd site, drop database, delete project files
 - [ ] **Post-install feature addition** — add command-only features after initial setup
 - [ ] **Installation dashboard** — view project info, installed features, and config values
 

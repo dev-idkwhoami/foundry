@@ -4,12 +4,15 @@ import {main} from '../models';
 import {config} from '../models';
 import {features} from '../models';
 import {installer} from '../models';
+import {db} from '../models';
 
 export function AddRecentDirectory(arg1:string):Promise<void>;
 
 export function CheckPatchCompatibility(arg1:string,arg2:Array<string>):Promise<main.CompatResult>;
 
 export function CheckTargetDirectory(arg1:string):Promise<string>;
+
+export function ForgetProject(arg1:number):Promise<void>;
 
 export function GetComposerVersion():Promise<string>;
 
@@ -35,9 +38,13 @@ export function GetStartupContext():Promise<main.StartupContext>;
 
 export function GetStartupResult():Promise<main.StartupResult>;
 
+export function HerdUnlink(arg1:string):Promise<void>;
+
 export function Install(arg1:installer.InstallRequest):Promise<void>;
 
 export function IsDebug():Promise<boolean>;
+
+export function ListProjects():Promise<Array<db.Installation>>;
 
 export function OpenFileInEditor(arg1:string):Promise<void>;
 

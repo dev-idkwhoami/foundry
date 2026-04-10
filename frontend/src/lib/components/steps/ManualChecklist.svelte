@@ -13,6 +13,7 @@
 	import {
 		Check,
 		ClipboardList,
+		ClipboardCopy,
 		FolderOpen,
 		X,
 	} from "lucide-svelte";
@@ -22,15 +23,15 @@
 	// Track completion per step using a keyed map so we don't need an $effect to sync array length
 	let checkedMap: Record<string, boolean> = $state({});
 
-	function stepKey(step: { featureId: string; file: string }): string {
-		return step.featureId + "::" + step.file;
+	function stepKey(step: { featureId: string; file: string; instruction: string }): string {
+		return step.featureId + "::" + (step.file || step.instruction);
 	}
 
-	function isChecked(step: { featureId: string; file: string }): boolean {
+	function isChecked(step: { featureId: string; file: string; instruction: string }): boolean {
 		return checkedMap[stepKey(step)] ?? false;
 	}
 
-	function toggleChecked(step: { featureId: string; file: string }, value: boolean) {
+	function toggleChecked(step: { featureId: string; file: string; instruction: string }, value: boolean) {
 		checkedMap[stepKey(step)] = value;
 	}
 
@@ -54,6 +55,16 @@
 	function handleDone() {
 		OpenInExplorer(get(targetPath));
 		Quit();
+	}
+
+	let copiedKey = $state<string | null>(null);
+
+	async function handleCopy(text: string, key: string) {
+		await navigator.clipboard.writeText(text);
+		copiedKey = key;
+		setTimeout(() => {
+			if (copiedKey === key) copiedKey = null;
+		}, 2000);
 	}
 
 	function handleClose() {
@@ -148,6 +159,21 @@
 								>
 									{step.instruction}
 								</p>
+								{#if step.copy}
+									{@const key = stepKey(step)}
+									<button
+										class="mt-1.5 flex items-center gap-2 border-2 border-border bg-zinc-950 px-3 py-1.5 text-left font-mono text-xs text-zinc-300 transition-colors hover:border-foreground/50"
+										onclick={() => handleCopy(step.copy, key)}
+										title="Copy to clipboard"
+									>
+										<code class="flex-1 select-all">{step.copy}</code>
+										{#if copiedKey === key}
+											<Check class="size-3 shrink-0 text-green-400" />
+										{:else}
+											<ClipboardCopy class="size-3 shrink-0 text-muted-foreground" />
+										{/if}
+									</button>
+								{/if}
 							</div>
 						</div>
 					</Card.Header>

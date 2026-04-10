@@ -27,6 +27,39 @@ export namespace config {
 
 }
 
+export namespace db {
+	
+	export class Installation {
+	    id: number;
+	    pathHash: string;
+	    projectPath: string;
+	    projectName: string;
+	    repository: string;
+	    siteName: string;
+	    dbName: string;
+	    installedAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Installation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.pathHash = source["pathHash"];
+	        this.projectPath = source["projectPath"];
+	        this.projectName = source["projectName"];
+	        this.repository = source["repository"];
+	        this.siteName = source["siteName"];
+	        this.dbName = source["dbName"];
+	        this.installedAt = source["installedAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+
+}
+
 export namespace features {
 	
 	export class ConfigOption {
@@ -132,6 +165,20 @@ export namespace features {
 	        this.diff = source["diff"];
 	    }
 	}
+	export class Instruction {
+	    text: string;
+	    copy: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Instruction(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.copy = source["copy"];
+	    }
+	}
 	export class Feature {
 	    id: string;
 	    name: string;
@@ -139,6 +186,7 @@ export namespace features {
 	    requires: string[];
 	    incompatible: string[];
 	    patches: Patch[];
+	    instructions: Instruction[];
 	    config: ConfigField[];
 	    hooks: Hooks;
 	
@@ -154,6 +202,7 @@ export namespace features {
 	        this.requires = source["requires"];
 	        this.incompatible = source["incompatible"];
 	        this.patches = this.convertValues(source["patches"], Patch);
+	        this.instructions = this.convertValues(source["instructions"], Instruction);
 	        this.config = this.convertValues(source["config"], ConfigField);
 	        this.hooks = this.convertValues(source["hooks"], Hooks);
 	    }

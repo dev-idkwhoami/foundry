@@ -11,8 +11,10 @@ import (
 	"sync"
 
 	"foundry/backend/config"
+	"foundry/backend/db"
 	"foundry/backend/features"
 	"foundry/backend/git"
+	"foundry/backend/herd"
 	"foundry/backend/installer"
 	foundrylog "foundry/backend/logger"
 	"foundry/backend/transformer"
@@ -375,4 +377,28 @@ func (a *App) Install(req installer.InstallRequest) {
 		result := installer.Run(a.ctx, req, a.config, a.registry, a.logger)
 		runtime.EventsEmit(a.ctx, "install:result", result)
 	}()
+}
+
+// ListProjects returns all tracked project installations from the database.
+func (a *App) ListProjects() ([]db.Installation, error) {
+	return db.ListInstallations()
+}
+
+// HerdUnlink removes the Herd site link for the given project path.
+func (a *App) HerdUnlink(projectPath string) error {
+	return herd.Unlink(projectPath)
+}
+
+// ForgetProject unlinks the project from Herd and deletes the installation
+// record from the database.
+func (a *App) ForgetProject(id int64) error {
+	inst, err := db.GetInstallationByID(id)
+	if err != nil {
+		return fmt.Errorf("lookup installation: %w", err)
+	}
+
+	// Best-effort Herd unlink — don't fail the whole operation if it errors.
+	_ = herd.Unlink(inst.ProjectPath)
+
+	return db.DeleteInstallation(id)
 }
