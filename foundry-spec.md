@@ -270,22 +270,39 @@ Declares features that cannot be used alongside this one. When a feature is sele
 
 Defines token substitution rules applied **to the .diff files before patching**. The Go backend reads the `.diff` file content, performs find-replace on the diff text itself using the mappings, then applies the now-customized diff via `git apply`. This means the patch lands with the correct names already in place.
 
-Mappings target specific lines in the `.diff` file by line number. This includes **diff header lines** (`diff --git`, `+++`) — so file paths in the diff are rewritten too. This means `git apply` creates files directly at the correct renamed paths with the correct content, in a single step.
+Each target supports two modes:
+
+| Mode | Field | Behavior |
+|---|---|---|
+| **Specific lines** | `lines: [1, 4, 8]` | Replace on each listed line (1-indexed) |
+| **Global** | *(omit `lines`)* | Replace on every line in the diff |
+
+Global mode is the simplest and works well when the `from` string is specific enough. Use `lines` when you need surgical control (e.g. diff headers, lines where the same word means different things).
+
+### Examples
+
+**Global mode** — replace everywhere in the diff:
 
 ```yaml
 mappings:
   - config_key: tenant_noun
     targets:
-      - line: 1
+      - from: Team
+        to: "{{tenant_noun}}"
+      - from: team
+        to: "{{tenant_noun:snake}}"
+```
+
+**Multiple lines** — target specific lines:
+
+```yaml
+mappings:
+  - config_key: tenant_noun
+    targets:
+      - lines: [1, 4, 8]
         from: Team
         to: "{{tenant_noun}}"
-      - line: 4
-        from: Team
-        to: "{{tenant_noun}}"
-      - line: 8
-        from: Team
-        to: "{{tenant_noun}}"
-      - line: 12
+      - lines: [12]
         from: team
         to: "{{tenant_noun:snake}}"
 ```
@@ -306,6 +323,8 @@ new file mode 100644                                      ← line 2: untouched
 ```
 
 After mapping resolution, `git apply` sees `+++ b/app/Models/Organization.php` and creates the file at the right path.
+
+> **Tip:** Mappings also target **diff header lines** (`diff --git`, `+++`), so file paths in the diff are rewritten too. This means `git apply` creates files directly at the correct renamed paths.
 
 ### Transformer Syntax
 

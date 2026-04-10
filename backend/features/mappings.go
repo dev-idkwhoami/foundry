@@ -14,11 +14,13 @@ type Mapping struct {
 	Targets   []Target `yaml:"targets" json:"targets"`
 }
 
-// Target identifies a specific line replacement within a file.
+// Target identifies where a replacement should be applied within a diff file.
+// Lines targets specific lines (1-indexed). When Lines is empty, the
+// replacement applies to every line in the diff (global mode).
 type Target struct {
-	Line int    `yaml:"line" json:"line"`
-	From string `yaml:"from" json:"from"`
-	To   string `yaml:"to" json:"to"`
+	Lines []int  `yaml:"lines" json:"lines"`
+	From  string `yaml:"from" json:"from"`
+	To    string `yaml:"to" json:"to"`
 }
 
 // ParseMappings reads a mappings.yaml file at the given path and returns
