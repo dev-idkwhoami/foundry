@@ -12,7 +12,7 @@ import (
 // runValidate builds the feature registry and tests all valid feature
 // combinations for patch conflicts using the merge engine.
 //
-// Usage: foundry validate [--verbose]
+// Usage: foundry-cli validate [--verbose]
 func runValidate(args []string) error {
 	fs := flag.NewFlagSet("validate", flag.ExitOnError)
 	verbose := fs.Bool("verbose", false, "Show detailed output")
@@ -25,12 +25,14 @@ func runValidate(args []string) error {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
+	fmt.Println("Building feature registry...")
+
 	registry, err := features.BuildRegistry(cwd)
 	if err != nil {
 		return fmt.Errorf("building registry: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "Found %d features\n", len(registry.Features))
+	fmt.Printf("Found %d feature(s)\n", len(registry.Features))
 
 	// Get topo order.
 	sorted, err := registry.TopologicalSort()
@@ -39,7 +41,7 @@ func runValidate(args []string) error {
 	}
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "Install order: %v\n", sorted)
+		fmt.Printf("Install order: %v\n", sorted)
 	}
 
 	// Collect all cdiff patches grouped by feature.
@@ -81,9 +83,9 @@ func runValidate(args []string) error {
 		return nil
 	}
 
+	fmt.Printf("Checking %d patch(es) for conflicts...\n", len(featureDiffs))
+
 	// Test all features together (the maximal set, excluding incompatibles).
-	// For a thorough check, we'd test all valid subsets. For now, test the
-	// full compatible set which catches the most common conflicts.
 	var allDiffs []patcher.Diff
 	for _, fd := range featureDiffs {
 		allDiffs = append(allDiffs, fd.diff)
@@ -98,13 +100,14 @@ func runValidate(args []string) error {
 	}
 
 	if len(conflicts) == 0 {
+		fmt.Println("")
 		fmt.Println("All patches are compatible.")
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "Found %d conflict(s):\n", len(conflicts))
+	fmt.Printf("\nFound %d conflict(s):\n", len(conflicts))
 	for _, c := range conflicts {
-		fmt.Fprintf(os.Stderr, "  %s: %s vs %s — %s\n", c.File, c.FeatureA, c.FeatureB, c.Reason)
+		fmt.Printf("  %s: %s vs %s — %s\n", c.File, c.FeatureA, c.FeatureB, c.Reason)
 	}
 	os.Exit(1)
 	return nil

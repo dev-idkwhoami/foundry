@@ -8,15 +8,20 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"foundry/backend/executil"
 )
 
 // reHunkHeader matches unified diff @@ headers with line numbers.
 var reHunkHeader = regexp.MustCompile(`^@@\s.*@@`)
 
+// reDiffFile matches the "diff --git a/<path>" header lines.
+var reDiffFile = regexp.MustCompile(`^diff --git a/(.+?) b/`)
+
 // runDiff generates a .cdiff from the current git diff against main.
 // It strips line numbers from @@ headers to produce context-only diffs.
 //
-// Usage: foundry diff [--feature <id>] [--out <path>] [--base <branch>]
+// Usage: foundry-cli diff [--feature <id>] [--out <path>] [--base <branch>]
 func runDiff(args []string) error {
 	fs := flag.NewFlagSet("diff", flag.ExitOnError)
 	featureID := fs.String("feature", "", "Feature ID — auto-places output in features/<id>/")
@@ -31,8 +36,27 @@ func runDiff(args []string) error {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
+	// Determine output destination early so we know where to print the summary.
+	dest := *outPath
+	if dest == "" && *featureID != "" {
+		featDir := filepath.Join(cwd, "features", *featureID)
+		if err := os.MkdirAll(featDir, 0755); err != nil {
+			return fmt.Errorf("creating feature dir: %w", err)
+		}
+		dest = filepath.Join(featDir, "changes.cdiff")
+	}
+
+	// When cdiff goes to stdout, keep the summary on stderr so piping works.
+	// When writing to a file, print everything to stdout.
+	info := os.Stdout
+	if dest == "" {
+		info = os.Stderr
+	}
+
+	fmt.Fprintf(info, "Diffing against %s...\n", *base)
+
 	// Run git diff excluding the features/ directory.
-	cmd := exec.Command("git", "diff", *base, "--", ".", ":(exclude)features/")
+	cmd := executil.Command("git", "diff", *base, "--", ".", ":(exclude)features/")
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
@@ -43,28 +67,31 @@ func runDiff(args []string) error {
 	}
 
 	if len(out) == 0 {
-		return fmt.Errorf("no differences found against %s", *base)
+		fmt.Fprintln(info, "No differences found.")
+		return nil
 	}
 
 	cdiff := convertToCdiff(string(out))
 
-	// Determine output destination.
-	dest := *outPath
-	if dest == "" && *featureID != "" {
-		featDir := filepath.Join(cwd, "features", *featureID)
-		if err := os.MkdirAll(featDir, 0755); err != nil {
-			return fmt.Errorf("creating feature dir: %w", err)
-		}
-		dest = filepath.Join(featDir, "changes.cdiff")
-	}
+	// Collect changed files and stats for the summary.
+	files, additions, deletions := diffStats(string(out))
 
 	if dest != "" {
 		if err := os.WriteFile(dest, []byte(cdiff), 0644); err != nil {
 			return fmt.Errorf("writing output: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "Written to %s\n", dest)
 	} else {
 		fmt.Print(cdiff)
+	}
+
+	// Print summary.
+	fmt.Fprintln(info, "")
+	fmt.Fprintf(info, "  %d file(s) changed, %d insertions(+), %d deletions(-)\n", len(files), additions, deletions)
+	for _, f := range files {
+		fmt.Fprintf(info, "    %s\n", f)
+	}
+	if dest != "" {
+		fmt.Fprintf(info, "\n  Written to %s\n", dest)
 	}
 
 	return nil
@@ -84,4 +111,25 @@ func convertToCdiff(gitDiff string) string {
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// diffStats extracts file names, insertion count, and deletion count
+// from a unified diff string.
+func diffStats(diff string) (files []string, additions, deletions int) {
+	seen := map[string]bool{}
+
+	for _, line := range strings.Split(diff, "\n") {
+		if m := reDiffFile.FindStringSubmatch(line); m != nil {
+			path := m[1]
+			if !seen[path] {
+				seen[path] = true
+				files = append(files, path)
+			}
+		} else if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			additions++
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			deletions++
+		}
+	}
+	return
 }

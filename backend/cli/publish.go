@@ -4,13 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
+	"strings"
+
+	"foundry/backend/executil"
 )
 
 // runPublish automates the workflow of publishing a feature's changes
 // to a dedicated branch.
 //
-// Usage: foundry publish --feature <id> [--message <msg>]
+// Usage: foundry-cli publish --feature <id> [--message <msg>]
 //
 // Steps:
 //  1. Stash current changes
@@ -43,27 +45,28 @@ func runPublish(args []string) error {
 	branch := "feature/" + *featureID
 
 	steps := []struct {
-		name string
-		args []string
+		label string
+		args  []string
 	}{
-		{"stash changes", []string{"git", "stash", "push", "-m", "foundry-publish-" + *featureID}},
-		{"switch to branch", []string{"git", "checkout", "-B", branch}},
-		{"pop stash", []string{"git", "stash", "pop"}},
-		{"stage changes", []string{"git", "add", "-A"}},
-		{"commit", []string{"git", "commit", "-m", commitMsg}},
+		{"Stashing changes", []string{"git", "stash", "push", "-m", "foundry-publish-" + *featureID}},
+		{"Switching to branch " + branch, []string{"git", "checkout", "-B", branch}},
+		{"Restoring stash", []string{"git", "stash", "pop"}},
+		{"Staging changes", []string{"git", "add", "-A"}},
+		{"Committing", []string{"git", "commit", "-m", commitMsg}},
 	}
 
 	for _, step := range steps {
-		fmt.Fprintf(os.Stderr, "  %s...\n", step.name)
-		cmd := exec.Command(step.args[0], step.args[1:]...)
+		fmt.Printf("  %s... ", step.label)
+		cmd := executil.Command(step.args[0], step.args[1:]...)
 		cmd.Dir = cwd
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%s: %w", step.name, err)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Println("FAILED")
+			return fmt.Errorf("%s: %s", strings.ToLower(step.label), strings.TrimSpace(string(out)))
 		}
+		fmt.Println("OK")
 	}
 
-	fmt.Fprintf(os.Stderr, "\nPublished to branch %s\n", branch)
+	fmt.Println("")
+	fmt.Printf("Published to branch %s\n", branch)
 	return nil
 }

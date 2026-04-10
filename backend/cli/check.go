@@ -13,7 +13,7 @@ import (
 // runCheck tests whether a specific feature is compatible with a given set
 // of other features.
 //
-// Usage: foundry check <feature-id> --with feat1,feat2,...
+// Usage: foundry-cli check <feature-id> --with feat1,feat2,...
 func runCheck(args []string) error {
 	fs := flag.NewFlagSet("check", flag.ExitOnError)
 	withFlag := fs.String("with", "", "Comma-separated list of feature IDs to check against")
@@ -22,7 +22,7 @@ func runCheck(args []string) error {
 	}
 
 	if fs.NArg() < 1 {
-		return fmt.Errorf("usage: foundry check <feature-id> --with feat1,feat2")
+		return fmt.Errorf("usage: foundry-cli check <feature-id> --with feat1,feat2")
 	}
 
 	targetID := fs.Arg(0)
@@ -37,6 +37,8 @@ func runCheck(args []string) error {
 	if err != nil {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
+
+	fmt.Printf("Checking %s against [%s]...\n", targetID, *withFlag)
 
 	registry, err := features.BuildRegistry(cwd)
 	if err != nil {
@@ -86,13 +88,14 @@ func runCheck(args []string) error {
 	}
 
 	if len(conflicts) == 0 {
+		fmt.Println("")
 		fmt.Printf("%s is compatible with [%s]\n", targetID, *withFlag)
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "Found %d conflict(s):\n", len(conflicts))
+	fmt.Printf("\nFound %d conflict(s):\n", len(conflicts))
 	for _, c := range conflicts {
-		fmt.Fprintf(os.Stderr, "  %s: %s vs %s — %s\n", c.File, c.FeatureA, c.FeatureB, c.Reason)
+		fmt.Printf("  %s: %s vs %s — %s\n", c.File, c.FeatureA, c.FeatureB, c.Reason)
 	}
 	os.Exit(1)
 	return nil

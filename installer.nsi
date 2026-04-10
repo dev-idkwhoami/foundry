@@ -15,6 +15,7 @@ RequestExecutionLevel user
 Section "Install"
   SetOutPath "$INSTDIR"
   File "build\bin\foundry.exe"
+  File "build\bin\foundry-cli.exe"
 
   ; Start Menu shortcut
   CreateDirectory "$SMPROGRAMS\Foundry"
@@ -24,7 +25,7 @@ Section "Install"
   ; Desktop shortcut
   CreateShortcut "$DESKTOP\Foundry.lnk" "$INSTDIR\foundry.exe"
 
-  ; Add to user PATH so CLI subcommands work from any terminal.
+  ; Add to user PATH so foundry (GUI) and foundry-cli work from any terminal.
   nsExec::ExecToLog 'powershell -NoProfile -Command "\
     $$p = [Environment]::GetEnvironmentVariable(\"Path\", \"User\"); \
     if ($$p -notlike \"*$INSTDIR*\") { \
@@ -40,6 +41,7 @@ SectionEnd
 
 Section "Uninstall"
   Delete "$INSTDIR\foundry.exe"
+  Delete "$INSTDIR\foundry-cli.exe"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"
   Delete "$SMPROGRAMS\Foundry\Foundry.lnk"

@@ -5,17 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"foundry/backend/executil"
 	"foundry/backend/transformer"
 )
 
 // runCreate scaffolds a new feature: creates a git branch, the feature
 // directory, and minimal manifest.yaml + mappings.yaml files.
 //
-// Usage: foundry create [<name>]
+// Usage: foundry-cli create [<name>]
 //
 // If <name> is omitted, the user is prompted. The feature ID is derived
 // from the name by applying snake_case + lowercase (e.g. "Themes" → "themes",
@@ -57,14 +57,14 @@ func runCreate(args []string) error {
 
 	// Create git branch.
 	branch := "feature/" + id
-	fmt.Fprintf(os.Stderr, "Creating branch %s...\n", branch)
-	cmd := exec.Command("git", "checkout", "-b", branch)
+	fmt.Printf("Creating branch %s... ", branch)
+	cmd := executil.Command("git", "checkout", "-b", branch)
 	cmd.Dir = cwd
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("creating branch: %w", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		fmt.Println("FAILED")
+		return fmt.Errorf("creating branch: %s", strings.TrimSpace(string(out)))
 	}
+	fmt.Println("OK")
 
 	// Create feature directory.
 	if err := os.MkdirAll(featDir, 0755); err != nil {
@@ -105,11 +105,12 @@ config: []
 		return fmt.Errorf("writing mappings.yaml: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "\nCreated feature %q (%s)\n", name, id)
-	fmt.Fprintf(os.Stderr, "  Branch:   %s\n", branch)
-	fmt.Fprintf(os.Stderr, "  Dir:      features/%s/\n", id)
-	fmt.Fprintf(os.Stderr, "  Manifest: features/%s/manifest.yaml\n", id)
-	fmt.Fprintf(os.Stderr, "  Mappings: features/%s/mappings.yaml\n", id)
+	fmt.Println("")
+	fmt.Printf("Created feature %q (%s)\n", name, id)
+	fmt.Printf("  Branch:   %s\n", branch)
+	fmt.Printf("  Dir:      features/%s/\n", id)
+	fmt.Printf("  Manifest: features/%s/manifest.yaml\n", id)
+	fmt.Printf("  Mappings: features/%s/mappings.yaml\n", id)
 
 	return nil
 }

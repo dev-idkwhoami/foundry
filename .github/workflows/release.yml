@@ -34,6 +34,10 @@ jobs:
         shell: pwsh
         run: wails build -clean -o foundry.exe
 
+      - name: Build CLI
+        shell: pwsh
+        run: go build -o build/bin/foundry-cli.exe ./cmd/cli/
+
       - name: Install NSIS
         shell: pwsh
         run: choco install nsis -y --no-progress
@@ -49,6 +53,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release
           Copy-Item build\bin\foundry.exe release\
+          Copy-Item build\bin\foundry-cli.exe release\
           Compress-Archive -Path release\* -DestinationPath foundry-windows-amd64.zip
 
       - name: Create GitHub Release
