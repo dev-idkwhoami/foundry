@@ -4,10 +4,10 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"foundry/backend/appdata"
+	"foundry/backend/executil"
 )
 
 // CloneOrPullTemp ensures a cached clone of the repository exists in
@@ -49,7 +49,7 @@ func CloneToTarget(repoURL, targetDir, projectName string) error {
 }
 
 func runClone(repoURL, dest string) error {
-	cmd := exec.Command("git", "clone", repoURL, dest)
+	cmd := executil.Command("git", "clone", repoURL, dest)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git clone failed: %w\n%s", err, output)
@@ -64,7 +64,7 @@ func isGitRepo(dir string) bool {
 }
 
 func gitPull(dir string) error {
-	cmd := exec.Command("git", "pull", "--ff-only")
+	cmd := executil.Command("git", "pull", "--ff-only")
 	cmd.Dir = dir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git pull failed: %w\n%s", err, output)
@@ -73,7 +73,7 @@ func gitPull(dir string) error {
 }
 
 func gitReset(dir string) {
-	cmd := exec.Command("git", "checkout", ".")
+	cmd := executil.Command("git", "checkout", ".")
 	cmd.Dir = dir
 	_ = cmd.Run()
 }

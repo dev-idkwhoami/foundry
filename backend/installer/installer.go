@@ -192,8 +192,13 @@ func Run(ctx context.Context, req InstallRequest, cfg *config.AppConfig, registr
 	// 12. Cleanup.
 	emitProgress(StageCleanup, "running")
 	emitLog("Cleaning up...")
-	if err := cleanup(projectDir, req.TempClonePath, cfg.Cleanup, emitLog); err != nil {
+	if err := cleanup(projectDir, req.TempClonePath, emitLog); err != nil {
 		return fail(StageCleanup, err.Error())
+	}
+	if len(cfg.Cleanup) > 0 {
+		if err := runCommands(projectDir, cfg.Cleanup, emitLog); err != nil {
+			return fail(StageCleanup, err.Error())
+		}
 	}
 	emitProgress(StageCleanup, "done")
 

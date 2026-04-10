@@ -3,9 +3,9 @@ package installer
 import (
 	"bufio"
 	"fmt"
-	"os/exec"
 	"strings"
 
+	"foundry/backend/executil"
 	"foundry/backend/features"
 	"foundry/backend/transformer"
 )
@@ -87,7 +87,7 @@ func runCommands(projectDir string, commands []string, emit func(string)) error 
 			continue
 		}
 
-		cmd := exec.Command(parts[0], parts[1:]...)
+		cmd := executil.Command(parts[0], parts[1:]...)
 		cmd.Dir = projectDir
 
 		stdout, err := cmd.StdoutPipe()

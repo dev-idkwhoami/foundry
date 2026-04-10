@@ -12,6 +12,7 @@ import (
 
 	"foundry/backend/config"
 	"foundry/backend/db"
+	"foundry/backend/executil"
 	"foundry/backend/features"
 	"foundry/backend/git"
 	"foundry/backend/herd"
@@ -121,7 +122,7 @@ func (a *App) AddRecentDirectory(dir string) error {
 // GetComposerVersion returns the installed Composer version string, or an
 // error if Composer is not found.
 func (a *App) GetComposerVersion() (string, error) {
-	out, err := exec.Command("composer", "--version").Output()
+	out, err := executil.Command("composer", "--version").Output()
 	if err != nil {
 		return "", fmt.Errorf("composer not found: %w", err)
 	}
@@ -255,7 +256,7 @@ func (a *App) GetFeatureRegistry() *features.Registry {
 // GetGitVersion returns the installed Git version string, or an error if
 // Git is not found.
 func (a *App) GetGitVersion() (string, error) {
-	out, err := exec.Command("git", "version").Output()
+	out, err := executil.Command("git", "version").Output()
 	if err != nil {
 		return "", fmt.Errorf("git not found: %w", err)
 	}
@@ -270,7 +271,7 @@ func (a *App) GetGitVersion() (string, error) {
 // GetHerdVersion returns the installed Herd version string, or an error if
 // Herd is not found.
 func (a *App) GetHerdVersion() (string, error) {
-	out, err := exec.Command("herd", "--version").Output()
+	out, err := executil.Command("herd", "--version").Output()
 	if err != nil {
 		return "", fmt.Errorf("herd not found: %w", err)
 	}
@@ -285,7 +286,7 @@ func (a *App) GetHerdVersion() (string, error) {
 // GetPHPVersion returns the installed PHP version string, or an error if
 // PHP is not found.
 func (a *App) GetPHPVersion() (string, error) {
-	out, err := exec.Command("php", "-v").Output()
+	out, err := executil.Command("php", "-v").Output()
 	if err != nil {
 		return "", fmt.Errorf("php not found: %w", err)
 	}
@@ -370,7 +371,7 @@ func (a *App) CheckPatchCompatibility(featureID string, selectedIDs []string) Co
 
 	// Fall back to git apply --check for legacy patches.
 	if hasLegacy {
-		resetCmd := exec.Command("git", "checkout", ".")
+		resetCmd := executil.Command("git", "checkout", ".")
 		resetCmd.Dir = a.tempClonePath
 		_ = resetCmd.Run()
 
@@ -384,7 +385,7 @@ func (a *App) CheckPatchCompatibility(featureID string, selectedIDs []string) Co
 					continue
 				}
 				patchPath := filepath.Join(a.tempClonePath, "features", sid, p.File)
-				cmd := exec.Command("git", "apply", patchPath)
+				cmd := executil.Command("git", "apply", patchPath)
 				cmd.Dir = a.tempClonePath
 				_ = cmd.Run()
 			}
@@ -400,17 +401,17 @@ func (a *App) CheckPatchCompatibility(featureID string, selectedIDs []string) Co
 				continue
 			}
 			patchPath := filepath.Join(a.tempClonePath, "features", featureID, p.File)
-			cmd := exec.Command("git", "apply", "--check", patchPath)
+			cmd := executil.Command("git", "apply", "--check", patchPath)
 			cmd.Dir = a.tempClonePath
 			if out, err := cmd.CombinedOutput(); err != nil {
-				r := exec.Command("git", "checkout", ".")
+				r := executil.Command("git", "checkout", ".")
 				r.Dir = a.tempClonePath
 				_ = r.Run()
 				return CompatResult{false, strings.TrimSpace(string(out))}
 			}
 		}
 
-		resetCmd2 := exec.Command("git", "checkout", ".")
+		resetCmd2 := executil.Command("git", "checkout", ".")
 		resetCmd2.Dir = a.tempClonePath
 		_ = resetCmd2.Run()
 	}

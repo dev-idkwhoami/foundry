@@ -3,26 +3,25 @@ package installer
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+
+	"foundry/backend/executil"
 )
 
-// cleanup removes configured paths from the installed project
-// and deletes the temp clone directory.
-func cleanup(projectDir, tempClonePath string, cleanupPaths []string, emit func(string)) error {
-	for _, rel := range cleanupPaths {
-		target := filepath.Join(projectDir, filepath.FromSlash(rel))
-		if _, err := os.Stat(target); err == nil {
-			emit(fmt.Sprintf("Removing %s", rel))
-			if err := os.RemoveAll(target); err != nil {
-				return fmt.Errorf("removing %s: %w", rel, err)
-			}
+// cleanup removes the features directory from the installed project
+// and resets the temp clone.
+func cleanup(projectDir, tempClonePath string, emit func(string)) error {
+	featuresDir := filepath.Join(projectDir, "features")
+	if _, err := os.Stat(featuresDir); err == nil {
+		emit("Removing features/")
+		if err := os.RemoveAll(featuresDir); err != nil {
+			return fmt.Errorf("removing features: %w", err)
 		}
 	}
 
 	if tempClonePath != "" {
 		emit("Resetting temp clone")
-		resetCmd := exec.Command("git", "checkout", ".")
+		resetCmd := executil.Command("git", "checkout", ".")
 		resetCmd.Dir = tempClonePath
 		_ = resetCmd.Run()
 	}

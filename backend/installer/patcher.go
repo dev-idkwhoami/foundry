@@ -3,10 +3,10 @@ package installer
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"foundry/backend/executil"
 	"foundry/backend/features"
 	"foundry/backend/patcher"
 	"foundry/backend/transformer"
@@ -198,7 +198,7 @@ func applyPatches(projectDir string, registry *features.Registry, selectedIDs []
 
 // gitApply applies a diff string to the project using git apply via stdin.
 func gitApply(projectDir, diff string) error {
-	cmd := exec.Command("git", "apply", "--whitespace=nowarn", "-")
+	cmd := executil.Command("git", "apply", "--whitespace=nowarn", "-")
 	cmd.Dir = projectDir
 	cmd.Stdin = strings.NewReader(diff)
 

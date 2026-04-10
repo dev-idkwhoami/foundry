@@ -147,17 +147,31 @@ export namespace features {
 	        this.postCleanup = source["postCleanup"];
 	    }
 	}
+	export class Instruction {
+	    text: string;
+	    copy: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Instruction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.copy = source["copy"];
+	    }
+	}
 	export class Patch {
 	    file: string;
 	    mode: string;
 	    format: string;
 	    instruction: string;
 	    diff: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Patch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.file = source["file"];
@@ -165,20 +179,6 @@ export namespace features {
 	        this.format = source["format"];
 	        this.instruction = source["instruction"];
 	        this.diff = source["diff"];
-	    }
-	}
-	export class Instruction {
-	    text: string;
-	    copy: string;
-
-	    static createFrom(source: any = {}) {
-	        return new Instruction(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.text = source["text"];
-	        this.copy = source["copy"];
 	    }
 	}
 	export class Feature {
@@ -227,6 +227,7 @@ export namespace features {
 		    return a;
 		}
 	}
+	
 	
 	
 	export class Registry {

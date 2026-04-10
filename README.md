@@ -74,14 +74,13 @@ App config lives at `%APPDATA%\Foundry\config.yml`:
 repository: "https://github.com/your-org/your-starter"
 
 setup:
-  - composer install
-  - npm install
+  - composer install --no-interaction
+  - npm install --no-fund --ignore-scripts
   - php artisan key:generate
   - php artisan storage:link
   - php artisan migrate:fresh --seed
 
-cleanup:
-  - features
+cleanup: []  # optional commands to run after install (features/ is always deleted automatically)
 ```
 
 Flux UI Pro credentials and other settings can be configured in the Settings panel (gear icon).

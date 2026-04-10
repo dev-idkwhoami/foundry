@@ -4,12 +4,15 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"foundry/backend/executil"
+
 	_ "github.com/lib/pq"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Setup links the project via Herd, creates a PostgreSQL database, and
@@ -40,7 +43,7 @@ func Setup(projectDir, projectName string) error {
 // Unlink runs `herd unlink` from the given project directory to remove the
 // Herd site link.
 func Unlink(projectDir string) error {
-	cmd := exec.Command("herd", "unlink")
+	cmd := executil.Command("herd", "unlink")
 	cmd.Dir = projectDir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%w\n%s", err, out)
@@ -50,7 +53,7 @@ func Unlink(projectDir string) error {
 
 // linkSite runs `herd link --secure <siteName>` from the project directory.
 func linkSite(projectDir, siteName string) error {
-	cmd := exec.Command("herd", "link", "--secure", siteName)
+	cmd := executil.Command("herd", "link", "--secure", siteName)
 	cmd.Dir = projectDir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%w\n%s", err, out)
@@ -110,13 +113,12 @@ func configureEnv(projectDir, siteName, dbName string) error {
 
 	content := string(data)
 
+	appName := cases.Title(language.English).String(strings.ReplaceAll(siteName, "-", " "))
 	replacements := map[string]string{
-		"DB_CONNECTION": "pgsql",
-		"DB_HOST":       "localhost",
-		"DB_USERNAME":   "root",
-		"DB_PASSWORD":   "",
-		"DB_DATABASE":   dbName,
-		"APP_URL":       fmt.Sprintf("https://%s.test", siteName),
+		"APP_NAME":          appName,
+		"APP_URL":           fmt.Sprintf("https://%s.test", siteName),
+		"DB_DATABASE":       dbName,
+		"MAIL_FROM_ADDRESS": fmt.Sprintf("noreply@%s.test", siteName),
 	}
 
 	for key, val := range replacements {

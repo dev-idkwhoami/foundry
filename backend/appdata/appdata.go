@@ -36,15 +36,13 @@ func Init() error {
 		defaultConfig := []byte(`repository: "https://github.com/dev-idkwhoami/foundry-starter"
 
 setup:
-  - composer install
-  - npm install
+  - composer install --no-interaction
+  - npm install --no-fund --ignore-scripts
   - php artisan key:generate
   - php artisan storage:link
   - php artisan migrate:fresh --seed
 
-cleanup:
-  - features
-  - app/Console/Commands/Foundry
+cleanup: []
 
 flux_composer_url: "https://composer.fluxui.dev"
 

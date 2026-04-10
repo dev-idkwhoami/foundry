@@ -8,6 +8,7 @@
   "wailsjsdir": "./frontend/src/lib",
   "frontend:dev:serverUrl": "auto",
   "build:dir": "build",
+  "ldflags": "-H windowsgui",
   "nsisType": "single",
   "info": {
     "companyName": "Maximilian Oswald",
