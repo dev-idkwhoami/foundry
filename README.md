@@ -54,17 +54,17 @@ foundry my-app
 
 When launched from a directory, Foundry uses the current directory as the working directory and the argument as the project name.
 
-### CLI subcommands (feature development)
+### CLI tool (feature development)
 
-Run from within the starter repository. These bypass the GUI entirely.
+A separate `foundry-cli` binary is included for feature development. Run from within the starter repository.
 
 | Command | Description |
 |---|---|
-| `foundry create [<name>]` | Scaffold a new feature (branch + directory + manifest + mappings) |
-| `foundry diff --feature <id>` | Generate a `.cdiff` from current branch changes |
-| `foundry publish --feature <id>` | Publish feature to its branch |
-| `foundry validate` | Check all features for patch conflicts |
-| `foundry check <id> --with f1,f2` | Check one feature against a set |
+| `foundry-cli create [<name>]` | Scaffold a new feature (branch + directory + manifest + mappings) |
+| `foundry-cli diff --feature <id>` | Generate a `.cdiff` from current branch changes |
+| `foundry-cli publish --feature <id>` | Publish feature to its branch |
+| `foundry-cli validate` | Check all features for patch conflicts |
+| `foundry-cli check <id> --with f1,f2` | Check one feature against a set |
 
 ## Configuration
 
@@ -101,9 +101,10 @@ Requires Go 1.25+, Node 20+, and the [Wails CLI](https://wails.io/docs/gettingst
 
 ```bash
 wails build
+go build -o build/bin/foundry-cli.exe ./cmd/cli/
 ```
 
-Produces `build/bin/foundry.exe`. For the NSIS installer, install NSIS and run:
+Produces `build/bin/foundry.exe` and `build/bin/foundry-cli.exe`. For the NSIS installer, install NSIS and run:
 
 ```bash
 makensis installer.nsi
